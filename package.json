@@ -1,0 +1,36 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently -k -n frontend,backend \"npm run dev -w @workspace/ajn-platform\" \"npm run dev -w @workspace/api-server\"",
+    "dev:frontend": "npm run dev -w @workspace/ajn-platform",
+    "dev:backend": "npm run dev -w @workspace/api-server",
+    "build": "npm run typecheck:libs && npm --workspaces --if-present run build",
+    "codegen": "npm run codegen -w @workspace/api-spec",
+    "db:setup": "node scripts/setup-database.mjs",
+    "db:seed": "node scripts/seed-database.mjs",
+    "db:check": "node scripts/check-database.mjs",
+    "db:generate": "npm run generate -w @workspace/db",
+    "db:migrate": "npm run migrate -w @workspace/db",
+    "lint": "npm run typecheck",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "npm run typecheck:libs && npm --workspaces --if-present run typecheck"
+  },
+  "private": true,
+  "workspaces": [
+    "artifacts/ajn-platform",
+    "artifacts/api-server",
+    "lib/api-client-react",
+    "lib/api-zod",
+    "lib/api-spec",
+    "lib/db",
+    "scripts"
+  ],
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "pg": "^8.20.0",
+    "prettier": "^3.8.3",
+    "typescript": "~5.9.3"
+  }
+}
