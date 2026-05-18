@@ -5,14 +5,14 @@ router = "application"
 deploymentTarget = "autoscale"
 
 [deployment.postBuild]
-args = ["pnpm", "store", "prune"]
+args = ["npm", "run", "build"]
 env = { "CI" = "true" }
 
 [workflows]
 runButton = "Project"
 
 [agent]
-stack = "PNPM_WORKSPACE"
+stack = "NEXTJS_NPM"
 expertMode = true
 
 [postMerge]
@@ -24,13 +24,5 @@ channel = "stable-25_05"
 packages = ["zip"]
 
 [[ports]]
-localPort = 8080
+localPort = 3000
 externalPort = 80
-
-[[ports]]
-localPort = 8081
-externalPort = 8081
-
-[[ports]]
-localPort = 20796
-externalPort = 3000
