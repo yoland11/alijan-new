@@ -1,7 +1,8 @@
-import { Link, useLocation, Outlet } from "react-router-dom";
-import { LayoutDashboard, Package, ShoppingBag, Wrench, Calendar, Users, Archive, DollarSign, Image, Truck, Star, UserCog, ChevronLeft } from "lucide-react";
+import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
+import { LayoutDashboard, Package, ShoppingBag, Wrench, Calendar, Users, Archive, DollarSign, Image, Truck, Star, UserCog, ChevronLeft, LogOut } from "lucide-react";
 import { useState } from "react";
-import { getGetMeQueryKey, useGetMe, type User } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { getGetMeQueryKey, useGetMe, useLogout, type User } from "@workspace/api-client-react";
 import { toSafeArray } from "@/lib/to-safe-array";
 
 const navItems = [
@@ -27,13 +28,25 @@ function canSee(user: User | undefined, permission: string): boolean {
 
 export default function AdminLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
   const { data: user } = useGetMe({
     query: { queryKey: getGetMeQueryKey(), retry: false },
   });
+  const logoutMutation = useLogout();
 
   const isActive = (to: string, exact?: boolean) => exact ? location.pathname === to : location.pathname.startsWith(to) && to !== "/admin";
   const visibleNavItems = navItems.filter((item) => canSee(user, item.permission));
+  const logout = () => {
+    logoutMutation.mutate(undefined, {
+      onSettled: () => {
+        queryClient.setQueryData(getGetMeQueryKey(), undefined);
+        queryClient.removeQueries({ queryKey: getGetMeQueryKey() });
+        navigate("/login", { replace: true });
+      },
+    });
+  };
 
   return (
     <div className="flex h-[calc(100vh-5rem)] overflow-hidden">
@@ -62,6 +75,15 @@ export default function AdminLayout() {
             <ChevronLeft className="w-4 h-4 rotate-180 flex-shrink-0" />
             {!collapsed && <span>العودة للموقع</span>}
           </Link>
+          <button
+            onClick={logout}
+            disabled={logoutMutation.isPending}
+            className="mt-1 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-primary transition-colors disabled:opacity-50"
+            title={collapsed ? "تسجيل خروج" : undefined}
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && <span>تسجيل خروج</span>}
+          </button>
         </div>
       </aside>
       <main className="flex-1 overflow-y-auto bg-background">

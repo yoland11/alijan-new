@@ -1,12 +1,12 @@
 "use client";
 
 import { BrowserRouter, Routes, Route, Link, NavLink, Navigate, useLocation } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { getGetMeQueryKey, useGetMe, type User } from "@workspace/api-client-react";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { getGetMeQueryKey, useGetMe, useLogout, type User } from "@workspace/api-client-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useState } from "react";
-import { Menu, X, ShoppingCart, User as UserIcon } from "lucide-react";
+import { LogOut, Menu, X, ShoppingCart, User as UserIcon } from "lucide-react";
 import { useCartStore, type CartItem } from "@/lib/cart-store";
 import { toSafeArray } from "@/lib/to-safe-array";
 import NotFound from "@/views/not-found";
@@ -43,6 +43,11 @@ const queryClient = new QueryClient({
 function Navbar() {
   const [open, setOpen] = useState(false);
   const { items } = useCartStore();
+  const activeQueryClient = useQueryClient();
+  const { data: user } = useGetMe({
+    query: { queryKey: getGetMeQueryKey(), retry: false },
+  });
+  const logoutMutation = useLogout();
   const cartItems = toSafeArray<CartItem>(items);
   const cartCount = cartItems.reduce((a, i) => a + Number(i?.quantity ?? 0), 0);
 
@@ -52,6 +57,16 @@ function Navbar() {
     { to: "/track", label: "تتبع الطلب" },
     { to: "/gallery", label: "أعمالنا" },
   ];
+
+  const logout = () => {
+    logoutMutation.mutate(undefined, {
+      onSettled: () => {
+        activeQueryClient.setQueryData(getGetMeQueryKey(), undefined);
+        activeQueryClient.removeQueries({ queryKey: getGetMeQueryKey() });
+        setOpen(false);
+      },
+    });
+  };
 
   return (
     <header className="border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
@@ -76,9 +91,19 @@ function Navbar() {
               </span>
             )}
           </Link>
-          <Link to="/login" className="hidden md:flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors">
-            <UserIcon className="w-4 h-4" /> حسابي
-          </Link>
+          {user ? (
+            <button
+              onClick={logout}
+              disabled={logoutMutation.isPending}
+              className="hidden md:flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors disabled:opacity-50"
+            >
+              <LogOut className="w-4 h-4" /> تسجيل خروج
+            </button>
+          ) : (
+            <Link to="/login" className="hidden md:flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors">
+              <UserIcon className="w-4 h-4" /> حسابي
+            </Link>
+          )}
           <button className="md:hidden p-2 hover:text-primary transition-colors" onClick={() => setOpen(!open)}>
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -93,7 +118,17 @@ function Navbar() {
             <Link to="/cart" onClick={() => setOpen(false)} className="text-sm font-medium hover:text-primary py-2">
               السلة {cartCount > 0 && `(${cartCount})`}
             </Link>
-            <Link to="/login" onClick={() => setOpen(false)} className="text-sm font-medium hover:text-primary py-2">تسجيل الدخول</Link>
+            {user ? (
+              <button
+                onClick={logout}
+                disabled={logoutMutation.isPending}
+                className="text-right text-sm font-medium hover:text-primary py-2 disabled:opacity-50"
+              >
+                تسجيل خروج
+              </button>
+            ) : (
+              <Link to="/login" onClick={() => setOpen(false)} className="text-sm font-medium hover:text-primary py-2">تسجيل الدخول</Link>
+            )}
           </div>
         </div>
       )}
