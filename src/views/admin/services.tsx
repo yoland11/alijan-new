@@ -4,11 +4,7 @@ import { useListServiceRequests, useUpdateServiceRequest, getListServiceRequests
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toSafeArray } from "@/lib/to-safe-array";
-
-const serviceNames: Record<string, string> = {
-  koshat: "كوشات", photography: "تصوير", albums: "ألبومات",
-  graduation: "تخرج", research: "بحوث", distributions: "توزيعات", gifts: "هدايا",
-};
+import { formatServiceRequestTrackingCode, getServiceDetailPairs, getServiceName } from "@/lib/service-catalog";
 const statuses = [
   { value: "", label: "الكل" }, { value: "pending", label: "انتظار" }, { value: "booked", label: "محجوز" },
   { value: "in_progress", label: "قيد التنفيذ" }, { value: "editing", label: "مونتاج" },
@@ -49,14 +45,32 @@ export default function AdminServices() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="text-primary font-bold">{serviceNames[sr.serviceType] ?? sr.serviceType}</span>
+                    <span className="text-primary font-bold">{getServiceName(sr.serviceType)}</span>
                     <span className={`px-2 py-0.5 rounded text-xs font-bold ${statusColors[sr.status] ?? ""}`}>
                       {statuses.find(s => s.value === sr.status)?.label ?? sr.status}
+                    </span>
+                    <span className="font-mono text-xs text-muted-foreground" dir="ltr">
+                      {formatServiceRequestTrackingCode(sr.id)}
                     </span>
                   </div>
                   <p className="font-medium">{sr.customerName}</p>
                   <p className="text-sm text-muted-foreground" dir="ltr">{sr.customerPhone}</p>
                   {sr.eventDate && <p className="text-sm text-muted-foreground mt-1">التاريخ: {sr.eventDate} {sr.eventTime ?? ""}</p>}
+                  {(() => {
+                    const pairs = getServiceDetailPairs(sr.serviceType, sr.details).slice(0, 6);
+                    if (pairs.length === 0) return null;
+
+                    return (
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+                        {pairs.map((item) => (
+                          <div key={item.key} className="rounded-lg border border-border bg-background/40 px-3 py-2">
+                            <p className="text-[11px] text-muted-foreground">{item.label}</p>
+                            <p className="mt-1 text-xs font-medium">{item.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   {sr.notes && <p className="text-sm text-muted-foreground mt-1">{sr.notes}</p>}
                 </div>
                 <div className="flex flex-col items-end gap-2">

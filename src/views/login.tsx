@@ -5,7 +5,7 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Lock, User } from "lucide-react";
+import { Loader2, Lock, User } from "lucide-react";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -13,8 +13,8 @@ export default function Login() {
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   
-  const { data: user, isLoading: checkingAuth } = useGetMe({
-    query: { queryKey: getGetMeQueryKey(), retry: false },
+  const { data: user } = useGetMe({
+    query: { queryKey: getGetMeQueryKey(), retry: false, refetchOnWindowFocus: false },
   });
   const loginMutation = useLogin();
 
@@ -34,13 +34,15 @@ export default function Login() {
       {
         onSuccess: (data) => {
           toast.success("تم تسجيل الدخول بنجاح");
+          void queryClient.cancelQueries({ queryKey: getGetMeQueryKey() });
           queryClient.setQueryData(getGetMeQueryKey(), data.user);
+
           if (data.user.role === "owner" || data.user.role === "admin" || data.user.role === "staff") {
-            navigate("/admin");
+            navigate("/admin", { replace: true });
           } else if (data.user.role === "delivery") {
-            navigate("/delivery");
+            navigate("/delivery", { replace: true });
           } else {
-            navigate("/account");
+            navigate("/account", { replace: true });
           }
         },
         onError: () => {
@@ -49,8 +51,6 @@ export default function Login() {
       }
     );
   };
-
-  if (checkingAuth) return null;
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-background">
@@ -99,9 +99,17 @@ export default function Login() {
             <Button
               type="submit"
               disabled={loginMutation.isPending}
+              aria-busy={loginMutation.isPending}
               className="w-full h-14 text-lg font-bold mt-8 shadow-[0_0_20px_rgba(201,168,76,0.1)] hover:shadow-[0_0_30px_rgba(201,168,76,0.3)] transition-shadow"
             >
-              {loginMutation.isPending ? "جاري الدخول..." : "دخول"}
+              {loginMutation.isPending ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  جاري التحقق...
+                </span>
+              ) : (
+                "دخول"
+              )}
             </Button>
           </form>
         </div>
