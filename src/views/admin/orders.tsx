@@ -3,12 +3,45 @@ import { motion } from "framer-motion";
 import { useListOrders, useUpdateOrder, getListOrdersQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown } from "lucide-react";
 import { toSafeArray } from "@/lib/to-safe-array";
+import { findProductColor } from "@/lib/product-colors";
 
 function safeNewDate(value: unknown) {
   const d = value ? new Date(value as any) : null;
   return d && !Number.isNaN(d.getTime()) ? d : null;
+}
+
+function getOrderItemName(item: any) {
+  return item?.productName ?? item?.product_name ?? item?.name ?? item?.nameAr ?? `منتج #${item?.productId ?? item?.product_id ?? "-"}`;
+}
+
+function getOrderItemColor(item: any) {
+  const color = item?.color ?? item?.selectedColorName ?? item?.selected_color_name ?? null;
+  return typeof color === "string" && color.trim() ? color.trim() : null;
+}
+
+function getCustomizationColorHex(item: any) {
+  const customization = item?.customization;
+  if (!customization) return undefined;
+
+  if (typeof customization === "object" && !Array.isArray(customization)) {
+    const colorHex = customization.colorHex ?? customization.color_hex;
+    return typeof colorHex === "string" ? colorHex : undefined;
+  }
+
+  if (typeof customization !== "string") return undefined;
+
+  try {
+    const parsed = JSON.parse(customization) as { colorHex?: unknown; color_hex?: unknown };
+    const colorHex = parsed.colorHex ?? parsed.color_hex;
+    return typeof colorHex === "string" ? colorHex : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function getOrderItemColorHex(item: any, colorName?: string | null) {
+  return getCustomizationColorHex(item) ?? findProductColor(colorName)?.hex;
 }
 
 const statuses = [
@@ -59,11 +92,11 @@ export default function AdminOrders() {
       {isLoading ? (
         <div className="space-y-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}</div>
       ) : (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-card border border-border rounded-xl overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm">
             <thead className="border-b border-border bg-muted/30">
               <tr>
-                {["رمز التتبع","الزبون","الهاتف","المبلغ","الحالة","التاريخ","تحديث"].map(h => (
+                {["رمز التتبع","الزبون","الهاتف","المنتجات","المبلغ","الحالة","التاريخ","تحديث"].map(h => (
                   <th key={h} className="text-right px-4 py-4 font-medium text-muted-foreground">{h}</th>
                 ))}
               </tr>
@@ -72,12 +105,47 @@ export default function AdminOrders() {
               {safeOrders.map((order) => {
                 const createdAt = safeNewDate(order.createdAt ?? order.created_at);
                 const totalAmount = Number(order.totalAmount ?? order.total_amount ?? order.total ?? 0);
+                const orderItems = toSafeArray<any>(order.items);
 
                 return (
                   <tr key={order.id ?? JSON.stringify(order)} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-4 font-mono text-primary">{order.trackingCode ?? order.orderCode ?? order.order_code ?? "-"}</td>
                     <td className="px-4 py-4 font-medium">{order.customerName ?? order.customer_name ?? order.name ?? "-"}</td>
                     <td className="px-4 py-4 text-muted-foreground" dir="ltr">{order.customerPhone ?? order.customer_phone ?? "-"}</td>
+                    <td className="px-4 py-4 min-w-52">
+                      {orderItems.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {orderItems.slice(0, 3).map((item, index) => {
+                            const colorName = getOrderItemColor(item);
+                            const colorHex = getOrderItemColorHex(item, colorName);
+                            const quantity = Number(item?.quantity ?? item?.qty ?? 0);
+
+                            return (
+                              <div key={`${item?.productId ?? item?.product_id ?? index}-${colorName ?? "no-color"}`} className="text-xs text-muted-foreground">
+                                <span className="font-medium text-foreground">{getOrderItemName(item)}</span>
+                                <span> ×{quantity || 1}</span>
+                                {colorName && (
+                                  <span className="mr-2 inline-flex items-center gap-1.5">
+                                    {colorHex && (
+                                      <span
+                                        className="h-3.5 w-3.5 rounded-full border border-white/20"
+                                        style={{ backgroundColor: colorHex }}
+                                      />
+                                    )}
+                                    اللون: {colorName}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {orderItems.length > 3 && (
+                            <p className="text-xs text-muted-foreground">+{orderItems.length - 3} منتجات أخرى</p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
                     <td className="px-4 py-4 font-bold">{totalAmount.toLocaleString("ar-IQ")} د.ع</td>
                     <td className="px-4 py-4">
                       <span className={`px-2 py-1 rounded-md text-xs font-bold ${statusColors[order.status] ?? ""}`}>
@@ -101,7 +169,7 @@ export default function AdminOrders() {
               })}
               {safeOrders.length === 0 && (
 
-                <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">لا توجد بيانات</td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">لا توجد بيانات</td></tr>
               )}
             </tbody>
           </table>

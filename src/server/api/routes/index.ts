@@ -13,6 +13,7 @@ import deliveryRouter from "./delivery";
 import customersRouter from "./customers";
 import employeesRouter from "./employees";
 import dashboardRouter from "./dashboard";
+import uploadsRouter from "./uploads";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(deliveryRouter);
 router.use(customersRouter);
 router.use(employeesRouter);
 router.use(dashboardRouter);
+router.use(uploadsRouter);
 
 export default router;

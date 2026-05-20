@@ -149,6 +149,11 @@ export function protectApiRoutes(
     return;
   }
 
+  if (path.startsWith("/uploads")) {
+    requirePermission("manage_products")(req, res, next);
+    return;
+  }
+
   if (path === "/services" && isWrite(method)) {
     requirePermission("manage_services")(req, res, next);
     return;

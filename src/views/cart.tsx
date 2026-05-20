@@ -51,7 +51,15 @@ export default function Cart() {
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-lg mb-1">{item.name}</h3>
                 {item.color && (
-                  <p className="text-sm text-muted-foreground mb-3">اللون: {item.color}</p>
+                  <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                    {item.colorHex && (
+                      <span
+                        className="h-4 w-4 rounded-full border border-white/20"
+                        style={{ backgroundColor: item.colorHex }}
+                      />
+                    )}
+                    <span>اللون: {item.color}</span>
+                  </div>
                 )}
                 <div className="flex items-center gap-3">
                   <button

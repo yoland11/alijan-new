@@ -8,9 +8,15 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trash2, Plus, ShoppingBag, Pencil } from "lucide-react";
+import { Trash2, Plus, ShoppingBag, Pencil, X, ImagePlus, Loader2 } from "lucide-react";
 import { toSafeArray } from "@/lib/to-safe-array";
-import { useState, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  normalizeProductColors,
+  PRODUCT_COLOR_LIBRARY,
+  productColorKey,
+  type ProductColorOption,
+} from "@/lib/product-colors";
 
 type ProductForm = {
   nameAr: string;
@@ -20,6 +26,7 @@ type ProductForm = {
   stockQuantity: string;
   descriptionAr: string;
   images: string;
+  colors: ProductColorOption[];
 };
 
 const emptyForm: ProductForm = {
@@ -30,7 +37,30 @@ const emptyForm: ProductForm = {
   stockQuantity: "0",
   descriptionAr: "",
   images: "",
+  colors: [],
 };
+
+function parseImageUrls(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((image) => image.trim())
+    .filter(Boolean);
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("تعذر قراءة الصورة"));
+    };
+    reader.onerror = () => reject(new Error("تعذر قراءة الصورة"));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function AdminProducts() {
   const { data: products, isLoading } = useListProducts();
@@ -41,25 +71,109 @@ export default function AdminProducts() {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [form, setForm] = useState<ProductForm>(emptyForm);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
 
   const safeProductItems = toSafeArray<any>(products);
+  const formImageUrls = parseImageUrls(form.images);
 
   const invalidateProducts = () =>
     queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
 
-  const updateField = (key: keyof ProductForm, value: string) => {
+  const updateField = (key: Exclude<keyof ProductForm, "colors">, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const toggleColor = (color: ProductColorOption) => {
+    setForm((current) => {
+      const exists = current.colors.some((item) => productColorKey(item) === productColorKey(color));
+      return {
+        ...current,
+        colors: exists
+          ? current.colors.filter((item) => productColorKey(item) !== productColorKey(color))
+          : [...current.colors, color],
+      };
+    });
+  };
+
+  const removeColor = (color: ProductColorOption) => {
+    setForm((current) => ({
+      ...current,
+      colors: current.colors.filter((item) => productColorKey(item) !== productColorKey(color)),
+    }));
+  };
+
+  const removeImage = (imageUrl: string) => {
+    setForm((current) => ({
+      ...current,
+      images: parseImageUrls(current.images)
+        .filter((image) => image !== imageUrl)
+        .join("\n"),
+    }));
+  };
+
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setImageUploadError("يرجى اختيار ملف صورة فقط");
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      setImageUploadError("حجم الصورة يجب أن لا يتجاوز 8MB");
+      return;
+    }
+
+    setImageUploadError(null);
+    setIsUploadingImage(true);
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const response = await fetch("/api/uploads/product-image", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type,
+          dataUrl,
+        }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        url?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !result.url) {
+        throw new Error(result.error ?? "تعذر رفع الصورة");
+      }
+
+      setForm((current) => ({
+        ...current,
+        images: [...parseImageUrls(current.images), result.url].join("\n"),
+      }));
+    } catch (err) {
+      setImageUploadError(err instanceof Error ? err.message : "تعذر رفع الصورة");
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingProduct(null);
     setForm(emptyForm);
+    setImageUploadError(null);
+    setIsUploadingImage(false);
   };
 
   const openCreate = () => {
     setEditingProduct(null);
     setForm(emptyForm);
+    setImageUploadError(null);
     setShowForm(true);
   };
 
@@ -73,7 +187,9 @@ export default function AdminProducts() {
       stockQuantity: String(product?.stockQuantity ?? 0),
       descriptionAr: product?.descriptionAr ?? "",
       images: toSafeArray<string>(product?.images).join("\n"),
+      colors: normalizeProductColors(product?.colors),
     });
+    setImageUploadError(null);
     setShowForm(true);
   };
 
@@ -87,10 +203,8 @@ export default function AdminProducts() {
       discountPrice: form.discountPrice ? Number(form.discountPrice) : undefined,
       stockQuantity: Number(form.stockQuantity || 0),
       descriptionAr: form.descriptionAr.trim() || undefined,
-      images: form.images
-        .split(/\r?\n/)
-        .map((image) => image.trim())
-        .filter(Boolean),
+      images: formImageUrls,
+      colors: form.colors,
     };
 
     const onSuccess = () => {
@@ -193,14 +307,119 @@ export default function AdminProducts() {
             />
           </div>
 
-          <div>
-            <label className="text-sm text-muted-foreground">روابط الصور</label>
+          <div className="md:col-span-2 rounded-xl border border-border bg-background/40 p-4">
+            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-base font-bold text-primary">صور المنتج</h2>
+                <p className="text-xs text-muted-foreground">ارفع صورة من جهازك أو أضف رابط صورة لكل سطر.</p>
+              </div>
+
+              <label
+                className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-primary/40 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 ${
+                  isUploadingImage ? "pointer-events-none opacity-60" : ""
+                }`}
+              >
+                {isUploadingImage ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="h-4 w-4" />
+                )}
+                {isUploadingImage ? "جاري رفع الصورة..." : "رفع صورة"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={handleImageUpload}
+                  disabled={isUploadingImage}
+                  className="sr-only"
+                />
+              </label>
+            </div>
+
             <textarea
               value={form.images}
               onChange={(event) => updateField("images", event.target.value)}
               className="mt-2 w-full bg-background border border-border rounded-lg px-3 py-2 outline-none focus:border-primary min-h-24"
               placeholder="رابط صورة لكل سطر"
             />
+
+            {imageUploadError && (
+              <p className="mt-2 text-sm text-destructive">{imageUploadError}</p>
+            )}
+
+            {formImageUrls.length > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {formImageUrls.map((imageUrl) => (
+                  <div key={imageUrl} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted">
+                    <img
+                      src={imageUrl}
+                      alt="صورة المنتج"
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(imageUrl)}
+                      className="absolute left-2 top-2 rounded-full bg-background/85 p-1.5 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-destructive group-hover:opacity-100"
+                      aria-label="حذف الصورة"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="md:col-span-2 rounded-xl border border-border bg-background/40 p-4">
+            <div className="mb-4 flex flex-col gap-1">
+              <h2 className="text-base font-bold text-primary">ألوان المنتج</h2>
+              <p className="text-xs text-muted-foreground">
+                اختر لوناً أو أكثر من القائمة الثابتة. إذا لم تختر أي لون لن يظهر قسم الألوان للزبون.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              {PRODUCT_COLOR_LIBRARY.map((color) => {
+                const selected = form.colors.some((item) => productColorKey(item) === productColorKey(color));
+
+                return (
+                  <button
+                    key={productColorKey(color)}
+                    type="button"
+                    onClick={() => toggleColor(color)}
+                    aria-pressed={selected}
+                    title={color.name}
+                    className={`relative h-10 w-10 rounded-full border transition-[transform,box-shadow,border-color] duration-150 ease-out hover:scale-110 ${
+                      selected
+                        ? "border-primary shadow-[0_0_0_3px_rgba(201,168,76,0.28)]"
+                        : "border-white/20 shadow-sm"
+                    }`}
+                    style={{ backgroundColor: color.hex }}
+                  >
+                    <span className="sr-only">{color.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {form.colors.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {form.colors.map((color) => (
+                  <button
+                    key={productColorKey(color)}
+                    type="button"
+                    onClick={() => removeColor(color)}
+                    className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary/50"
+                  >
+                    <span
+                      className="h-4 w-4 rounded-full border border-white/20"
+                      style={{ backgroundColor: color.hex }}
+                    />
+                    {color.name}
+                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="md:col-span-2">
@@ -241,6 +460,7 @@ export default function AdminProducts() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {safeProductItems.map((p: any, i: number) => {
             const image = toSafeArray<string>(p.images)[0] ?? p.imageUrl;
+            const productColors = normalizeProductColors(p.colors);
 
             return (
               <motion.div
@@ -323,6 +543,22 @@ export default function AdminProducts() {
                         : "نفذ"}
                     </span>
                   </div>
+
+                  {productColors.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-1.5">
+                      {productColors.slice(0, 10).map((color) => (
+                        <span
+                          key={productColorKey(color)}
+                          className="h-5 w-5 rounded-full border border-white/20"
+                          title={color.name}
+                          style={{ backgroundColor: color.hex }}
+                        />
+                      ))}
+                      {productColors.length > 10 && (
+                        <span className="text-xs text-muted-foreground">+{productColors.length - 10}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             );

@@ -8,6 +8,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   color?: string;
+  colorHex?: string;
   image?: string;
 }
 

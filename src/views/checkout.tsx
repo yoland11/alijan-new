@@ -45,6 +45,7 @@ export default function Checkout() {
             quantity: i.quantity,
             unitPrice: i.price,
             color: i.color,
+            customization: i.colorHex ? JSON.stringify({ colorHex: i.colorHex }) : undefined,
           })),
         },
       },
@@ -183,7 +184,17 @@ export default function Checkout() {
               <div key={`${item.productId}-${item.color}`} className="flex justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{item.name}</p>
-                  {item.color && <p className="text-xs text-muted-foreground">اللون: {item.color}</p>}
+                  {item.color && (
+                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                      {item.colorHex && (
+                        <span
+                          className="h-3.5 w-3.5 rounded-full border border-white/20"
+                          style={{ backgroundColor: item.colorHex }}
+                        />
+                      )}
+                      <span>اللون: {item.color}</span>
+                    </div>
+                  )}
                   <p className="text-sm text-muted-foreground">×{item.quantity}</p>
                 </div>
                 <p className="font-bold flex-shrink-0">{(item.price * item.quantity).toLocaleString("ar-IQ")} د.ع</p>

@@ -6,11 +6,12 @@ import {
 } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Star, ShoppingCart, Minus, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { toSafeArray } from "@/lib/to-safe-array";
 import { useCartStore } from "@/lib/cart-store";
+import { normalizeProductColors, productColorKey, type ProductColorOption } from "@/lib/product-colors";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -26,13 +27,18 @@ export default function ProductDetail() {
   });
 
   const [quantity, setQuantity] = useState(1);
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<ProductColorOption | null>(null);
   const addItem = useCartStore((state) => state.addItem);
   const safeImages = toSafeArray<string>(productAny?.images);
-  const safeColors = toSafeArray<any>(productAny?.colors);
+  const safeColors = normalizeProductColors(productAny?.colors);
   const safeRelatedProducts = toSafeArray<any>(relatedProducts).filter(
     (related) => related?.id !== productAny?.id,
   );
+
+  useEffect(() => {
+    setQuantity(1);
+    setSelectedColor(null);
+  }, [productId]);
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -47,7 +53,8 @@ export default function ProductDetail() {
       name: product.nameAr,
       price: Number(product.discountPrice ?? product.price ?? 0),
       quantity,
-      color: selectedColor ?? undefined,
+      color: selectedColor?.name,
+      colorHex: selectedColor?.hex,
       image: safeImages[0],
     });
 
@@ -138,16 +145,30 @@ export default function ProductDetail() {
             <div className="mb-8">
               <h3 className="font-bold mb-4">اللون</h3>
               <div className="flex flex-wrap gap-3">
-                {safeColors.map(color => (
+                {safeColors.map(color => {
+                  const selected = selectedColor ? productColorKey(selectedColor) === productColorKey(color) : false;
+
+                  return (
                   <button
-                    key={color.name}
-                    onClick={() => setSelectedColor(color.name)}
-                    className={`w-10 h-10 rounded-full border-2 transition-all ${selectedColor === color.name ? 'border-primary scale-110' : 'border-transparent hover:scale-105'}`}
+                    key={productColorKey(color)}
+                    onClick={() => setSelectedColor(color)}
+                    aria-pressed={selected}
+                    className={`h-10 w-10 rounded-full border transition-[transform,box-shadow,border-color] duration-150 ease-out hover:scale-110 ${
+                      selected
+                        ? "border-primary shadow-[0_0_0_3px_rgba(201,168,76,0.28)]"
+                        : "border-white/20"
+                    }`}
                     style={{ backgroundColor: color.hex }}
                     title={color.name}
-                  />
-                ))}
+                  >
+                    <span className="sr-only">{color.name}</span>
+                  </button>
+                );
+                })}
               </div>
+              {selectedColor && (
+                <p className="mt-3 text-sm text-muted-foreground">اللون المختار: {selectedColor.name}</p>
+              )}
             </div>
           )}
 
