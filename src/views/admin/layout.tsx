@@ -1,5 +1,5 @@
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Package, ShoppingBag, Wrench, Calendar, Users, Archive, DollarSign, Image, Truck, Star, UserCog, ChevronLeft, LogOut, Home } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Wrench, Calendar, Users, Archive, DollarSign, Image, Truck, Star, UserCog, ChevronLeft, LogOut } from "lucide-react";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetMeQueryKey, useGetMe, useLogout, type User } from "@workspace/api-client-react";
@@ -71,25 +71,19 @@ export default function AdminLayout() {
           })}
         </nav>
         <div className="p-3 border-t border-sidebar-border">
-          <div className={`grid gap-2 ${collapsed ? "grid-cols-1" : "grid-cols-2"}`}>
-            <Link
-              to="/"
-              className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
-              title={collapsed ? "عرض الموقع" : undefined}
-            >
-              <Home className="w-4 h-4 flex-shrink-0" />
-              {!collapsed && <span>عرض الموقع</span>}
-            </Link>
+          <Link to="/" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-sidebar-accent transition-colors`}>
+            <ChevronLeft className="w-4 h-4 rotate-180 flex-shrink-0" />
+            {!collapsed && <span>العودة للموقع</span>}
+          </Link>
           <button
             onClick={logout}
             disabled={logoutMutation.isPending}
-            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground border border-sidebar-border hover:bg-sidebar-accent hover:text-primary transition-colors disabled:opacity-50"
+            className="mt-1 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-primary transition-colors disabled:opacity-50"
             title={collapsed ? "تسجيل خروج" : undefined}
           >
             <LogOut className="w-4 h-4 flex-shrink-0" />
             {!collapsed && <span>تسجيل خروج</span>}
           </button>
-          </div>
         </div>
       </aside>
       <main className="flex-1 overflow-y-auto bg-background">

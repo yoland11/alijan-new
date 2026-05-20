@@ -1,9 +1,7 @@
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
 import { useListOrders, useListServiceRequests } from "@workspace/api-client-react";
 import { Package, Wrench, Clock } from "lucide-react";
 import { toSafeArray } from "@/lib/to-safe-array";
-import { formatServiceRequestTrackingCode, getServiceName } from "@/lib/service-catalog";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -99,15 +97,8 @@ export default function Account() {
                   className="bg-card border border-border rounded-xl p-6 flex items-center justify-between gap-4"
                 >
                   <div>
-                    <p className="font-bold">{getServiceName(sr.serviceType)}</p>
+                    <p className="font-bold">{sr.serviceType}</p>
                     <p className="text-sm text-muted-foreground mt-1">{sr.customerName}</p>
-                    <Link
-                      to={`/track?code=${formatServiceRequestTrackingCode(sr.id)}`}
-                      className="mt-1 inline-block font-mono text-sm font-bold text-primary"
-                      dir="ltr"
-                    >
-                      {formatServiceRequestTrackingCode(sr.id)}
-                    </Link>
                     {sr.eventDate && (
                       <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                         <Clock className="w-4 h-4" /> {sr.eventDate}

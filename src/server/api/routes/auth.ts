@@ -51,31 +51,16 @@ function serializeAdminUser(user: AdminUser, permissions: string[]) {
   };
 }
 
-async function ensureDefaultAdminUser(existingUser?: AdminUser): Promise<AdminUser> {
-  const existing = existingUser
-    ? [existingUser]
-    : await db
-        .select()
-        .from(adminUsersTable)
-        .where(eq(adminUsersTable.username, defaultAdminUsername))
-        .limit(1);
+async function ensureDefaultAdminUser(): Promise<AdminUser> {
+  const passwordHash = await hashPassword(defaultAdminPassword);
+  const existing = await db
+    .select()
+    .from(adminUsersTable)
+    .where(eq(adminUsersTable.username, defaultAdminUsername))
+    .limit(1);
 
   if (existing.length > 0) {
     const user = existing[0];
-    const needsUpdate =
-      user.fullName !== (user.fullName || "المدير الأساسي") ||
-      user.role !== "owner" ||
-      !user.isActive ||
-      !user.passwordHash;
-
-    if (!needsUpdate) {
-      return user;
-    }
-
-    const passwordHash = user.passwordHash
-      ? user.passwordHash
-      : await hashPassword(defaultAdminPassword);
-
     const updated = await db
       .update(adminUsersTable)
       .set({
@@ -88,10 +73,22 @@ async function ensureDefaultAdminUser(existingUser?: AdminUser): Promise<AdminUs
       .where(eq(adminUsersTable.id, user.id))
       .returning();
 
+    for (const permissionKey of PERMISSIONS) {
+      await db
+        .insert(adminPermissionsTable)
+        .values({ userId: user.id, permissionKey, allowed: true })
+        .onConflictDoUpdate({
+          target: [
+            adminPermissionsTable.userId,
+            adminPermissionsTable.permissionKey,
+          ],
+          set: { allowed: true },
+        });
+    }
+
     return updated[0];
   }
 
-  const passwordHash = await hashPassword(defaultAdminPassword);
   const inserted = await db
     .insert(adminUsersTable)
     .values({
@@ -103,20 +100,11 @@ async function ensureDefaultAdminUser(existingUser?: AdminUser): Promise<AdminUs
     })
     .returning();
 
-  await Promise.all(
-    PERMISSIONS.map((permissionKey) =>
-      db
-        .insert(adminPermissionsTable)
-        .values({ userId: inserted[0].id, permissionKey, allowed: true })
-        .onConflictDoUpdate({
-          target: [
-            adminPermissionsTable.userId,
-            adminPermissionsTable.permissionKey,
-          ],
-          set: { allowed: true },
-        }),
-    ),
-  );
+  for (const permissionKey of PERMISSIONS) {
+    await db
+      .insert(adminPermissionsTable)
+      .values({ userId: inserted[0].id, permissionKey, allowed: true });
+  }
 
   return inserted[0];
 }
@@ -134,16 +122,13 @@ router.post("/auth/login", async (req, res) => {
       return;
     }
 
-    let users = await db
+    await ensureDefaultAdminUser();
+
+    const users = await db
       .select()
       .from(adminUsersTable)
       .where(eq(adminUsersTable.username, username))
       .limit(1);
-
-    if (username === defaultAdminUsername) {
-      const adminUser = await ensureDefaultAdminUser(users[0]);
-      users = [adminUser];
-    }
 
     if (users.length === 0 || !users[0].isActive) {
       res.status(401).json({ error: "بيانات الدخول غير صحيحة" });

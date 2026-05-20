@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, ordersTable, serviceRequestsTable } from "@workspace/db";
+import { db, ordersTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 
 function generateTrackingCode(): string {
@@ -14,27 +14,6 @@ function formatOrder(o: typeof ordersTable.$inferSelect) {
     totalAmount: parseFloat(String(o.totalAmount)),
     createdAt: o.createdAt?.toISOString(),
     updatedAt: o.updatedAt?.toISOString(),
-  };
-}
-
-function formatTrackedServiceRequest(s: typeof serviceRequestsTable.$inferSelect) {
-  return {
-    id: s.id,
-    kind: "service",
-    trackingCode: `SR-${s.id}`,
-    serviceType: s.serviceType,
-    customerId: s.customerId,
-    customerName: s.customerName,
-    customerPhone: s.customerPhone,
-    status: s.status,
-    eventDate: s.eventDate,
-    eventTime: s.eventTime,
-    location: s.location,
-    details: s.details ?? {},
-    notes: s.notes,
-    totalAmount: s.totalAmount ? parseFloat(s.totalAmount) : null,
-    createdAt: s.createdAt?.toISOString(),
-    updatedAt: s.createdAt?.toISOString(),
   };
 }
 
@@ -84,24 +63,7 @@ router.post("/orders", async (req, res) => {
 router.get("/orders/track/:trackingCode", async (req, res) => {
   try {
     const items = await db.select().from(ordersTable).where(eq(ordersTable.trackingCode, req.params.trackingCode)).limit(1);
-    if (!items.length) {
-      const serviceMatch = /^SR-(\d+)$/i.exec(req.params.trackingCode.trim());
-      if (serviceMatch) {
-        const serviceItems = await db
-          .select()
-          .from(serviceRequestsTable)
-          .where(eq(serviceRequestsTable.id, Number(serviceMatch[1])))
-          .limit(1);
-
-        if (serviceItems.length) {
-          res.json(formatTrackedServiceRequest(serviceItems[0]));
-          return;
-        }
-      }
-
-      res.status(404).json({ error: "الطلب غير موجود" });
-      return;
-    }
+    if (!items.length) { res.status(404).json({ error: "الطلب غير موجود" }); return; }
     res.json(formatOrder(items[0]));
   } catch (err) {
     req.log.error({ err }, "track order error");

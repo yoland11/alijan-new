@@ -6,7 +6,7 @@ import { getGetMeQueryKey, useGetMe, useLogout, type User } from "@workspace/api
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useState } from "react";
-import { LayoutDashboard, LogOut, Menu, X, ShoppingCart, User as UserIcon } from "lucide-react";
+import { LogOut, Menu, X, ShoppingCart, User as UserIcon } from "lucide-react";
 import { useCartStore, type CartItem } from "@/lib/cart-store";
 import { toSafeArray } from "@/lib/to-safe-array";
 import NotFound from "@/views/not-found";
@@ -57,7 +57,6 @@ function Navbar() {
     { to: "/track", label: "تتبع الطلب" },
     { to: "/gallery", label: "أعمالنا" },
   ];
-  const controlPanelPath = user?.role === "delivery" ? "/delivery" : "/admin";
 
   const logout = () => {
     logoutMutation.mutate(undefined, {
@@ -93,21 +92,13 @@ function Navbar() {
             )}
           </Link>
           {user ? (
-            <div className="hidden md:flex items-center gap-3">
-              <Link
-                to={controlPanelPath}
-                className="flex items-center gap-1.5 text-sm font-medium text-primary hover:opacity-80 transition-opacity"
-              >
-                <LayoutDashboard className="w-4 h-4" /> لوحة التحكم
-              </Link>
-              <button
-                onClick={logout}
-                disabled={logoutMutation.isPending}
-                className="flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors disabled:opacity-50"
-              >
-                <LogOut className="w-4 h-4" /> تسجيل خروج
-              </button>
-            </div>
+            <button
+              onClick={logout}
+              disabled={logoutMutation.isPending}
+              className="hidden md:flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors disabled:opacity-50"
+            >
+              <LogOut className="w-4 h-4" /> تسجيل خروج
+            </button>
           ) : (
             <Link to="/login" className="hidden md:flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors">
               <UserIcon className="w-4 h-4" /> حسابي
@@ -128,22 +119,13 @@ function Navbar() {
               السلة {cartCount > 0 && `(${cartCount})`}
             </Link>
             {user ? (
-              <>
-                <Link
-                  to={controlPanelPath}
-                  onClick={() => setOpen(false)}
-                  className="text-sm font-medium text-primary hover:opacity-80 py-2"
-                >
-                  لوحة التحكم
-                </Link>
-                <button
-                  onClick={logout}
-                  disabled={logoutMutation.isPending}
-                  className="text-right text-sm font-medium hover:text-primary py-2 disabled:opacity-50"
-                >
-                  تسجيل خروج
-                </button>
-              </>
+              <button
+                onClick={logout}
+                disabled={logoutMutation.isPending}
+                className="text-right text-sm font-medium hover:text-primary py-2 disabled:opacity-50"
+              >
+                تسجيل خروج
+              </button>
             ) : (
               <Link to="/login" onClick={() => setOpen(false)} className="text-sm font-medium hover:text-primary py-2">تسجيل الدخول</Link>
             )}
@@ -275,8 +257,6 @@ function App() {
             <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
             <Route path="/services" element={<PublicLayout><Services /></PublicLayout>} />
             <Route path="/services/:type" element={<PublicLayout><ServiceRequest /></PublicLayout>} />
-            <Route path="/book" element={<PublicLayout><Services /></PublicLayout>} />
-            <Route path="/book/:type" element={<PublicLayout><ServiceRequest /></PublicLayout>} />
             <Route path="/store" element={<PublicLayout><Store /></PublicLayout>} />
             <Route path="/store/:id" element={<PublicLayout><ProductDetail /></PublicLayout>} />
             <Route path="/cart" element={<PublicLayout><Cart /></PublicLayout>} />
